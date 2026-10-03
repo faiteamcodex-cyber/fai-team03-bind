@@ -1,22 +1,28 @@
 import { useEffect } from 'react'
 
 import { StatusBadge } from '@/components/claims/StatusBadge'
+
+import { ClaimDetail } from '@/components/docket/ClaimDetail'
+import { DocketList } from '@/components/docket/DocketList'
+import { DocketSummaryBar } from '@/components/docket/DocketSummaryBar'
+
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { Header } from '@/components/layout/Header'
 import { Panel } from '@/components/layout/Panel'
-import { useDocket, useError, useLoadState } from '@/hooks'
-import { CLAIM_STATUS_ORDER } from '@/lib/status'
+import { useDocket, useError, useLoadState, useSelectedClaim } from '@/hooks'
 import { MOCK_DEFAULT_DOCKET_ID } from '@/services/mockApi'
 import { useDocketStore } from '@/store/docketStore'
 import { DOCKET_STATUS } from '@/types'
 
 export function Dashboard() {
   const docket = useDocket()
+  const selectedClaim = useSelectedClaim()
   const loadState = useLoadState()
   const error = useError()
   const loadDocket = useDocketStore((state) => state.loadDocket)
   const refresh = useDocketStore((state) => state.refresh)
+  const selectClaim = useDocketStore((state) => state.selectClaim)
 
   useEffect(() => {
     if (loadState === 'idle') {
@@ -155,32 +161,17 @@ export function Dashboard() {
                 ) : undefined
               }
             >
-              <div className="space-y-3 p-4">
-                <p className="text-xs text-slate-500">
-                  Docket region. Claim cards arrive in Step 6 once the contract layer
-                  exists (Step 3).
-                </p>
-
-                <div className="border-t border-line pt-3">
-                  <p className="mb-2 text-[11px] font-medium tracking-wide text-slate-500 uppercase">
-                    Status vocabulary currently supported
-                  </p>
-                  <ul className="flex flex-wrap gap-1.5">
-                    {CLAIM_STATUS_ORDER.map((status) => (
-                      <li key={status}>
-                        <StatusBadge status={status} />
-                      </li>
-                    ))}
-                    <li>
-                      <StatusBadge status="REJECTED" />
-                    </li>
-                  </ul>
-                  <p className="mt-2 text-[11px] text-slate-500">
-                    Mirrored from Member 1&apos;s <code>backend/app/schemas/enums.py</code>{' '}
-                    (ClaimStatus). Unknown values from the backend still render safely
-                    instead of breaking the dashboard.
-                  </p>
-                </div>
+              {docket && <DocketSummaryBar docket={docket} />}
+              <div className="overflow-y-auto max-h-[480px]">
+                <DocketList />
+                {selectedClaim && (
+                  <div className="border-t border-line bg-surface-1">
+                    <ClaimDetail
+                      claim={selectedClaim}
+                      onClose={() => selectClaim(null)}
+                    />
+                  </div>
+                )}
               </div>
             </Panel>
 

@@ -50,7 +50,7 @@ describe('Dashboard page', () => {
 
     render(<Dashboard />)
 
-    expect(screen.getByText(MOCK_DOCKET_STAMPED.id)).toBeInTheDocument()
+    expect(screen.getAllByText(MOCK_DOCKET_STAMPED.id).length).toBeGreaterThan(0)
     expect(
       screen.getByRole('heading', { name: 'Cadastral map' }),
     ).toBeInTheDocument()
@@ -65,7 +65,7 @@ describe('Dashboard page', () => {
 
     render(<Dashboard />)
 
-    expect(screen.getByText(MOCK_DOCKET_REJECTED.id)).toBeInTheDocument()
+    expect(screen.getAllByText(MOCK_DOCKET_REJECTED.id).length).toBeGreaterThan(0)
     expect(
       screen.getByRole('heading', { name: 'Cadastral map' }),
     ).toBeInTheDocument()
