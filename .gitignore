@@ -1,0 +1,34 @@
+# Environment files (CRITICAL: NEVER COMMIT SECRETS)
+.env
+*.env
+backend/.env
+backend/scripts/.env
+
+# Skip PDFs and Word docs per user request
+*.pdf
+*.docx
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.log
+venv/
+.venv/
+env/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary extraction files
+temp_extracted.txt
+
+# Node / Web (for future frontend)
+node_modules/
+dist/
+build/

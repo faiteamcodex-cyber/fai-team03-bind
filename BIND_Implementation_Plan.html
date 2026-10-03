@@ -1,0 +1,121 @@
+<html><head><style>body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 20px; } h1, h2, h3 { color: #333; } table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #ddd; padding: 8px; } th { background-color: #f2f2f2; }</style></head><body><h1>BIND Project: Master Implementation &amp; Development Plan</h1>
+<h2>1. System Architecture &amp; Project Flow</h2>
+<p><strong>1.1 High-Level Architecture</strong>
+The BIND system operates as an event-driven, serverless orchestration kernel. It strictly enforces a "Claim-Bind-Stamp" lifecycle, decoupling the reasoning (Planner) from the execution (Router/Models).</p>
+<ul>
+<li><strong>Presentation Layer:</strong> React single-page application integrating MapLibre GL for geospatial rendering and a reactive Docket UI.</li>
+<li><strong>API Layer:</strong> AWS API Gateway exposing RESTful endpoints.</li>
+<li><strong>Compute Kernel:</strong> AWS Lambda running a Python/FastAPI state machine.</li>
+<li><strong>Orchestration Brain:</strong> LLM A (<code>gpt-5.6-luna</code> via AWS Bedrock) acting exclusively as the Planner and Verifier.</li>
+<li><strong>Execution Engines (Writers):</strong> </li>
+<li>GIS Tool (GeoPandas)</li>
+<li>LandRecord Mock (DynamoDB/SQLite)</li>
+<li>RAG AdvisoryStore (ChromaDB + Titan Embeddings)</li>
+<li>Student Vision (<code>amazon.nova-lite</code>)</li>
+<li>Teacher Vision (<code>gpt-5.6-terra</code>)</li>
+</ul>
+<p><strong>1.2 Step-by-Step Project Flow</strong>
+1. <strong>Input:</strong> Client submits a multimodal payload (Text Request + GeoJSON bounds + Optional Image) to the <code>/docket/open</code> API.
+2. <strong>Parse:</strong> API Gateway routes the payload to the Lambda Kernel. A deterministic gazetteer extracts the target survey number (e.g., "202/55").
+3. <strong>Plan:</strong> The Lambda Kernel invokes <code>gpt-5.6-luna</code>. Luna returns a structured JSON array of required <code>Claims</code> (e.g., <code>GEO.PARCEL</code>, <code>REG.OWNER</code>, <code>VIS.CROP</code>, <code>ADV.FERTILIZER</code>) with assigned <code>Harm Classes</code>.
+4. <strong>Compile &amp; Route:</strong> The deterministic Budget Compiler assigns a specific execution engine to each claim based on Harm Class and remaining budget constraints (Max $0.08 per request).
+5. <strong>Execute (Parallelized):</strong>
+   * <strong>GIS Tool</strong> fetches polygon coordinates.
+   * <strong>LandRecord DB</strong> queries ownership records.
+   * <strong>Student Vision</strong> analyzes the image.
+   * <em>Fallback Hook:</em> If Student Vision confidence is &lt; 0.65, the Router synchronously escalates the image to <code>gpt-5.6-terra</code>.
+6. <strong>Verify (Bind &amp; Stamp):</strong> All returned <code>Exhibits</code> are passed back to <code>gpt-5.6-luna</code> (The Binder). Luna executes cross-modal predicates (e.g., Does the fertilizer circular match the vision crop? Does the image GPS fall within the GIS polygon?).
+7. <strong>Output:</strong> Stamped and Rejected claims are serialized into a final Docket JSON and returned to the client UI.</p>
+<p><strong>1.3 Integration Points</strong>
+* <strong>Frontend ↔ Backend:</strong> OpenAPI (Swagger) defined REST contracts via API Gateway.
+* <strong>Kernel ↔ AWS Bedrock:</strong> Boto3 SDK <code>InvokeModel</code> API calls.
+* <strong>Kernel ↔ S3:</strong> Boto3 <code>get_object</code> for image stream processing.</p>
+<hr />
+<h2>2. Tech Stack &amp; AWS Infrastructure</h2>
+<p><strong>2.1 Primary Tech Stack</strong>
+* <strong>Frontend:</strong> React 18, TypeScript, Vite, TailwindCSS, MapLibre GL JS, Zustand (State Management).
+* <strong>Backend:</strong> Python 3.11, FastAPI, Pydantic v2, Mangum (Lambda Adapter), GeoPandas, Shapely.
+* <strong>Database / RAG:</strong> ChromaDB (In-memory/S3 persistent) for Vector Store, SQLite/DynamoDB for Land Records.
+* <strong>ML Infrastructure:</strong> AWS Bedrock exclusively. No custom training frameworks.
+* <strong>IaC (Infrastructure as Code):</strong> AWS SAM (Serverless Application Model).</p>
+<p><strong>2.2 Specific AWS Resources</strong>
+* <strong>AWS SSO (fai-tce-team03):</strong> Identity management. All resources strictly deployed in <code>ap-south-1</code> (Mumbai).
+* <strong>AWS S3:</strong> <code>fai-tce-team03-datasets</code> for raw data ingestion; <code>fai-tce-team03-app-state</code> for ChromaDB persistence.
+* <strong>AWS API Gateway:</strong> HTTP API tier for low-latency, low-cost routing.
+* <strong>AWS Lambda:</strong> Serverless execution of the Python FastAPI kernel. Justification: Prevents idle EC2 costs, respecting the $100 budget limit.
+* <strong>AWS Bedrock:</strong> Invocation layer for <code>luna</code>, <code>terra</code>, <code>nova-lite</code>, and <code>titan-text-v2</code>.
+* <strong>Amazon DynamoDB:</strong> Key-value store for mock land records. Justification: Zero configuration, scales to zero.</p>
+<p><strong>2.3 AWS Environment &amp; Model Setup Guide</strong>
+1. <strong>Authentication:</strong> All members authenticate via AWS Access Portal URL. Configure local profiles via <code>aws configure sso</code>.
+2. <strong>Bedrock Access:</strong> Navigate to AWS Bedrock Console in <code>ap-south-1</code>. Go to "Model Access" and verify/request access for <code>luna</code>, <code>terra</code>, <code>nova-lite</code>, and <code>titan</code>.
+3. <strong>IAM Roles:</strong> Update the provided <code>FAI-TCE-LambdaExecutionRole</code> to include <code>bedrock:InvokeModel</code> and <code>s3:GetObject</code> on the <code>fai-tce-team03-*</code> resources.
+4. <strong>SAM Initialization:</strong> Run <code>sam init</code> using a Python 3.11 template. Define the API Gateway and Lambda functions within <code>template.yaml</code>.</p>
+<hr />
+<h2>3. Data &amp; Model Pipeline</h2>
+<p><strong>3.1 Strict Dataset Requirements</strong>
+* <strong>Raw Data Location:</strong> All Task 2 (Land Documents) and Task 4 (Crop Images) files currently on OneDrive must be uploaded directly to <code>s3://fai-tce-team03-datasets/</code>.
+* <strong>Data Formatting:</strong>
+  * <strong>Images:</strong> Must be <code>.jpg</code> or <code>.png</code>. Maximum size 4MB per image (Lambda payload limits).
+  * <strong>Cadastral Maps:</strong> Must be converted to valid <code>GeoJSON</code> FeatureCollections.
+  * <strong>Advisory Documents:</strong> Must be extracted from PDF to markdown/text chunks before vectorization.</p>
+<p><strong>3.2 Inter-Task Dependencies</strong>
+* <strong>GIS → Vision:</strong> The Vision model cannot be accepted as fact unless the GIS point-in-polygon check confirms the image GPS metadata falls within the target GeoJSON boundaries.
+* <strong>Vision → RAG:</strong> The Advisory RAG query is blocked until the Vision model confirms the Crop Type and Growth Stage. RAG filters must use these outputs as hard WHERE clauses.</p>
+<p><strong>3.3 Model Setup &amp; Deployment Strategy</strong>
+* <strong>No Model Training:</strong> BIND is an inference-only orchestration engine.
+* <strong>Prompt Engineering:</strong> Store all LLM system prompts in a centralized <code>/prompts</code> configuration directory in the backend repository.
+* <strong>RAG Pipeline (Titan Embeddings):</strong> 
+  1. Script pulls Advisory PDFs from S3.
+  2. Python chunks text by paragraphs.
+  3. Boto3 invokes Titan Text Embeddings.
+  4. Vectors are loaded into ChromaDB, mapped with metadata tags (Crop, Zone, Stage).</p>
+<hr />
+<h2>4. Team Member Responsibilities</h2>
+<p><strong>Member 1: Sudharshanan (Backend/Kernel Architect)</strong>
+* <strong>Responsibility:</strong> Design and implement the core State Machine and Pydantic schemas.
+* <strong>Deliverable A:</strong> Complete Pydantic models for <code>Docket</code>, <code>Claim</code>, <code>Exhibit</code>, and <code>AdvisoryForm</code> (Strict validation).
+* <strong>Deliverable B:</strong> The API Gateway/FastAPI entrypoints (<code>POST /docket</code>).
+* <strong>Deliverable C:</strong> The <code>gpt-5.6-luna</code> Binder logic (cross-modal verification loop).
+* <strong>Blocker Warning:</strong> Member 4 relies on your Pydantic schemas to build the UI types. Deliver schemas by Day 2.</p>
+<p><strong>Member 2: Dinesh Kumar (ML/Bedrock Integration Engineer)</strong>
+* <strong>Responsibility:</strong> AWS Bedrock integration and the Budget Router.
+* <strong>Deliverable A:</strong> Python classes wrapping Boto3 <code>InvokeModel</code> for <code>luna</code>, <code>terra</code>, and <code>nova-lite</code>.
+* <strong>Deliverable B:</strong> The deterministic Router algorithm that calculates Harm Class logic and tracks request costs.
+* <strong>Deliverable C:</strong> The Vision Fallback execution script (handling <code>nova-lite</code> confidence &lt; 0.65 logic).
+* <strong>Blocker Warning:</strong> Member 1 relies on your router returning standardized exhibit objects to proceed with the Binder.</p>
+<p><strong>Member 3: Harsith (Data/GIS &amp; DevOps Engineer)</strong>
+* <strong>Responsibility:</strong> Cloud data ingestion, GIS logic, and RAG vectorization.
+* <strong>Deliverable A:</strong> AWS S3 ingestion scripts and SAM deployment (<code>template.yaml</code>) management.
+* <strong>Deliverable B:</strong> Python GeoPandas logic for Survey Number → GeoJSON parsing and Point-in-Polygon checks.
+* <strong>Deliverable C:</strong> The RAG Advisory pipeline (Chunking → Titan Embeddings → ChromaDB).
+* <strong>Blocker Warning:</strong> Member 1 and 2 cannot test end-to-end without your mock data in S3 and DynamoDB.</p>
+<p><strong>Member 4: Sarath Aswin (Frontend UI/UX Developer)</strong>
+* <strong>Responsibility:</strong> Build the React SPA and geospatial visualization.
+* <strong>Deliverable A:</strong> MapLibre GL integration rendering the <code>fai-tce-team03</code> cadastral GeoJSON overlays.
+* <strong>Deliverable B:</strong> The Reactive Docket UI (real-time status updates of Claims moving from OPEN to STAMPED).
+* <strong>Deliverable C:</strong> The Cost Comparison Panel (calculating savings based on routed paths vs. always-Terra).
+* <strong>Blocker Warning:</strong> Must mock API responses based on Member 1's schemas until the backend is fully deployed.</p>
+<hr />
+<h2>5. Phase-by-Phase Development Roadmap</h2>
+<p><strong>Phase 1: Setup &amp; Data Ingestion (Days 1-3)</strong>
+* <strong>Harsith:</strong> Upload 6GB dataset to S3. Initialize AWS SAM configuration. Create DynamoDB mock tables.
+* <strong>Sudharshanan:</strong> Establish FastAPI skeleton. Finalize and push Pydantic JSON schemas to GitHub.
+* <strong>Dinesh:</strong> Configure local AWS SSO profiles. Prove <code>boto3</code> Bedrock connectivity via a simple script.
+* <strong>Sarath:</strong> Initialize React + Vite project. Establish MapLibre component and mock the Docket UI states.
+* <strong>Handoff 1:</strong> GitHub repository is stable, schemas are locked, and AWS IAM roles are validated.</p>
+<p><strong>Phase 2: Core Components &amp; Mocks (Days 4-7)</strong>
+* <strong>Harsith:</strong> Finish GeoPandas tools and Titan RAG indexing pipeline.
+* <strong>Dinesh:</strong> Complete the Router class and the <code>nova-lite</code> / <code>terra</code> vision invocation scripts.
+* <strong>Sudharshanan:</strong> Write the <code>gpt-5.6-luna</code> Planner prompt. Connect the FastAPI endpoints to Dinesh's Router.
+* <strong>Sarath:</strong> Build the API connection layer in React. Render mock data accurately on the map.
+* <strong>Handoff 2:</strong> Backend can successfully parse a mocked string into a routed Claim set. </p>
+<p><strong>Phase 3: Agentic Kernel Integration (Days 8-11)</strong>
+* <strong>Sudharshanan &amp; Dinesh:</strong> Connect the executed tools back into the Binder loop. Pass the Binder's output back to the client.
+* <strong>Harsith:</strong> Deploy the first iteration of the Lambda function via AWS SAM to <code>ap-south-1</code>. Ensure API Gateway CORS configurations allow localhost frontend testing.
+* <strong>Sarath:</strong> Connect React UI to the live API Gateway endpoint.
+* <strong>Handoff 3:</strong> System is running end-to-end in the cloud. A hardcoded query successfully updates the React UI.</p>
+<p><strong>Phase 4: Testing &amp; Deployment (Days 12-15)</strong>
+* <strong>All Members:</strong> Execute the 202/55 demonstration script.
+* <strong>Dinesh &amp; Sudharshanan:</strong> Trigger edge cases (Force a low-confidence vision prediction; Force a mismatched GIS polygon). Verify the system recovers or correctly Rejects the claim.
+* <strong>Sarath:</strong> Polish UI. Ensure the Cost Ledger accurately reflects the API responses.
+* <strong>Harsith:</strong> Final code freeze. Execute production AWS SAM deployment. Ensure all cloud resources strictly match the <code>fai-tce-team03-*</code> naming convention.</p></body></html>
