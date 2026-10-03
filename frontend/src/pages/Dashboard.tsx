@@ -6,6 +6,8 @@ import { ClaimDetail } from '@/components/docket/ClaimDetail'
 import { DocketList } from '@/components/docket/DocketList'
 import { DocketSummaryBar } from '@/components/docket/DocketSummaryBar'
 
+import { BindMap } from '@/components/map/BindMap'
+
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { Header } from '@/components/layout/Header'
@@ -136,15 +138,13 @@ export function Dashboard() {
             id="map"
             title="Cadastral map"
             description="Survey parcels, target parcel and vision GPS point."
-            actions={<StatusBadge status="OPEN" />}
-            className="min-h-[320px]"
+            actions={<StatusBadge status={docket?.status ?? 'OPEN'} />}
+            className="min-h-[360px]"
           >
-            <div className="flex h-full min-h-[280px] items-center justify-center p-6 text-center">
-              <p className="max-w-sm text-xs leading-relaxed text-slate-500">
-                Map region. MapLibre GL and the cadastral GeoJSON fixture are added in
-                Steps 7–8 of the frontend build order.
-              </p>
-            </div>
+            <BindMap
+              mapView={docket?.map}
+              targetSurveyNumber={docket?.surveyNumber}
+            />
           </Panel>
 
           <div className="grid min-h-0 grid-rows-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
