@@ -233,30 +233,37 @@ class DocketKernel:
         connector = self.connectors.get("student_vision")
         if connector:
             result = await connector.predict(docket, claim)
+            claim.writer = settings.student_vision_model_id
+            claim.value = result
+            claim.confidence = result.get("confidence", 0.0)
+            from app.connectors.vision import vision_engine
+            exhibit = vision_engine.create_prediction_exhibit(result, settings.student_vision_model_id)
+            docket.add_exhibit(exhibit)
+            claim.exhibit_ids.append(exhibit.id)
+            if claim.confidence < settings.student_confidence_threshold:
+                logger.info(f"Student confidence {claim.confidence:.2f} < {settings.student_confidence_threshold}. Escalating to teacher.")
+                remaining = docket.remaining_budget_usd(settings.max_docket_cost_usd)
+                if can_escalate_to_teacher(remaining):
+                    await self._run_teacher_vision(docket, claim)
+                else:
+                    claim.stamp_reason = "Low confidence but budget exhausted for teacher escalation."
         else:
-            from app.connectors.vision import mock_student_predict
-            result = await mock_student_predict(claim.type)
-
-        claim.writer = settings.student_vision_model_id
-        claim.value = result
-        claim.confidence = result.get("confidence", 0.0)
-
-        # Check if escalation to teacher is needed
-        if claim.confidence < settings.student_confidence_threshold:
-            logger.info(f"Student confidence {claim.confidence:.2f} < {settings.student_confidence_threshold}. Escalating to teacher.")
-            remaining = docket.remaining_budget_usd(settings.max_docket_cost_usd)
-            if can_escalate_to_teacher(remaining):
-                await self._run_teacher_vision(docket, claim)
-            else:
-                claim.stamp_reason = "Low confidence but budget exhausted for teacher escalation."
+            from app.connectors.vision import vision_engine
+            image_bytes = getattr(docket, "_raw_image_bytes", None)
+            await vision_engine.execute_claim_with_fallback(docket, claim, image_bytes)
 
     async def _run_teacher_vision(self, docket: Docket, claim: Claim) -> None:
         connector = self.connectors.get("teacher_vision")
         if connector:
             result = await connector.predict(docket, claim)
         else:
-            from app.connectors.vision import mock_teacher_predict
-            result = await mock_teacher_predict(claim.type)
+            from app.connectors.vision import vision_engine
+            result = await vision_engine.predict_teacher(claim.type)
+
+        from app.connectors.vision import vision_engine
+        teacher_exhibit = vision_engine.create_prediction_exhibit(result, settings.teacher_vision_model_id)
+        docket.add_exhibit(teacher_exhibit)
+        claim.exhibit_ids.append(teacher_exhibit.id)
 
         # Check for dispute
         student_label = claim.value.get("label") if claim.value else None
