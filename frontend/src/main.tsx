@@ -1,0 +1,17 @@
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+
+import App from './App.tsx'
+import './index.css'
+
+const rootElement = document.getElementById('root')
+if (!rootElement) {
+  // Fail loudly instead of a blank white page.
+  throw new Error('BIND: #root element not found in index.html')
+}
+
+createRoot(rootElement).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
