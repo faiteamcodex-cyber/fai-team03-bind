@@ -1,4 +1,5 @@
 import { MOCK_PARCELS } from '@/data/mockGeoJSON'
+import type { MapPhotoPoint } from '@/services/mappers'
 import type { ParcelFeature } from '@/types'
 import type { FeatureCollection, Geometry } from 'geojson'
 
@@ -63,15 +64,70 @@ export function createParcelFeatureCollection(
 ): FeatureCollection<Geometry, ParcelProperties> {
   return {
     type: 'FeatureCollection',
-    features: parcels.map((feature) => {
+    features: parcels.map((feature, index) => {
       const props = extractParcelProperties(
         feature.properties as Record<string, unknown>,
         targetSurveyNumber,
       )
       return {
         ...feature,
+        id: index,
         properties: props,
       }
     }),
   }
 }
+
+/** Compute bounding box [[minLon, minLat], [maxLon, maxLat]] for a polygon feature. */
+export function getParcelBounds(
+  feature: ParcelFeature,
+): [[number, number], [number, number]] | null {
+  if (feature.geometry.type !== 'Polygon') return null
+  const coords = feature.geometry.coordinates[0]
+  if (!coords || coords.length === 0) return null
+
+  let minLon = Infinity
+  let maxLon = -Infinity
+  let minLat = Infinity
+  let maxLat = -Infinity
+
+  for (const [lon, lat] of coords) {
+    if (lon !== undefined && lat !== undefined) {
+      minLon = Math.min(minLon, lon)
+      maxLon = Math.max(maxLon, lon)
+      minLat = Math.min(minLat, lat)
+      maxLat = Math.max(maxLat, lat)
+    }
+  }
+
+  if (!Number.isFinite(minLon)) return null
+  return [
+    [minLon, minLat],
+    [maxLon, maxLat],
+  ]
+}
+
+/** Create HTML marker element for photo GPS points with kernel verdict badges. */
+export function createPhotoMarkerElement(photo: MapPhotoPoint): HTMLElement {
+  const container = document.createElement('div')
+  container.className = 'group relative cursor-pointer'
+
+  if (photo.isBound) {
+    container.innerHTML = `
+      <div class="flex items-center gap-1.5 rounded-full border border-emerald-400/60 bg-emerald-950/90 px-2.5 py-1 shadow-md backdrop-blur text-[11px] font-semibold text-emerald-200" title="Photo GPS inside parcel ${photo.surveyNumber}">
+        <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Photo (GPS inside)</span>
+      </div>
+    `
+  } else {
+    container.innerHTML = `
+      <div class="flex items-center gap-1.5 rounded-md border border-red-500/80 bg-red-950/95 px-2.5 py-1 shadow-lg backdrop-blur text-[11px] font-bold text-red-200 ring-2 ring-red-500/40" title="Photo GPS outside parcel ${photo.surveyNumber}">
+        <span class="h-2.5 w-2.5 rounded-full bg-red-500 animate-ping"></span>
+        <span data-testid="unbound-marker-callout">GPS outside parcel</span>
+      </div>
+    `
+  }
+
+  return container
+}
+

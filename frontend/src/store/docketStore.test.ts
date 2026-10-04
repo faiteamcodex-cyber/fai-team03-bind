@@ -69,20 +69,34 @@ describe('docketStore', () => {
     expect(state.error?.kind).toBe('network')
   })
 
-  it('updates selectedClaimId when selectClaim is called', () => {
+  it('updates selectedClaimId and selectedSurveyNumber when a geometry claim is selected', async () => {
+    await useDocketStore.getState().loadDocket(MOCK_DEFAULT_DOCKET_ID)
     useDocketStore.getState().selectClaim('clm-geo0a1')
+
     expect(useDocketStore.getState().selectedClaimId).toBe('clm-geo0a1')
+    expect(useDocketStore.getState().selectedSurveyNumber).toBe('202/55')
 
     useDocketStore.getState().selectClaim(null)
     expect(useDocketStore.getState().selectedClaimId).toBeNull()
+    expect(useDocketStore.getState().selectedSurveyNumber).toBeNull()
   })
 
-  it('updates selectedSurveyNumber when selectSurveyNumber is called', () => {
+  it('leaves selectedSurveyNumber unchanged when a non-geometry claim is selected', async () => {
+    await useDocketStore.getState().loadDocket(MOCK_DEFAULT_DOCKET_ID)
     useDocketStore.getState().selectSurveyNumber('202/55')
-    expect(useDocketStore.getState().selectedSurveyNumber).toBe('202/55')
 
-    useDocketStore.getState().selectSurveyNumber(null)
-    expect(useDocketStore.getState().selectedSurveyNumber).toBeNull()
+    // clm-wxc0a1 is WX.CONTEXT (non-geometry)
+    useDocketStore.getState().selectClaim('clm-wxc0a1')
+    expect(useDocketStore.getState().selectedClaimId).toBe('clm-wxc0a1')
+    expect(useDocketStore.getState().selectedSurveyNumber).toBe('202/55')
+  })
+
+  it('updates selectedClaimId when selectSurveyNumber is called', async () => {
+    await useDocketStore.getState().loadDocket(MOCK_DEFAULT_DOCKET_ID)
+    useDocketStore.getState().selectSurveyNumber('202/55')
+
+    expect(useDocketStore.getState().selectedSurveyNumber).toBe('202/55')
+    expect(useDocketStore.getState().selectedClaimId).toBe('clm-geo0a1')
   })
 
   it('clears error when clearError is called', async () => {
@@ -104,10 +118,8 @@ describe('docketStore', () => {
     useDocketStore.getState().startPolling(1000)
     expect(useDocketStore.getState().isPolling).toBe(true)
 
-    // Advance fake timer to trigger the polling callback
     await vi.advanceTimersByTimeAsync(1000)
 
-    // Because loaded docket status is CLOSED, polling must stop automatically
     expect(useDocketStore.getState().isPolling).toBe(false)
   })
 
@@ -159,6 +171,7 @@ describe('selector hooks', () => {
 
     const { result: mapHook } = renderHook(() => useMapView())
     expect(mapHook.current).not.toBeNull()
+    expect(mapHook.current?.parcels.filter((p) => p.isTarget)).toHaveLength(1)
 
     const firstClaimId = claimsHook.current[0]?.id ?? null
     if (firstClaimId) {

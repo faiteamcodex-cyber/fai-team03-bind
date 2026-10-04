@@ -43,6 +43,7 @@ export const useDocketStore = create<DocketState>((set, get) => ({
         docket: docketView,
         loadState: 'ready',
         error: null,
+        selectedSurveyNumber: docketView.surveyNumber,
       })
       if (
         docketView.status === DOCKET_STATUS.CLOSED ||
@@ -71,6 +72,7 @@ export const useDocketStore = create<DocketState>((set, get) => ({
         docket: docketView,
         loadState: 'ready',
         error: null,
+        selectedSurveyNumber: docketView.surveyNumber,
       })
       if (
         docketView.status === DOCKET_STATUS.CLOSED ||
@@ -98,11 +100,123 @@ export const useDocketStore = create<DocketState>((set, get) => ({
   },
 
   selectClaim: (id: string | null): void => {
-    set({ selectedClaimId: id })
+    if (id === null) {
+      set({ selectedClaimId: null, selectedSurveyNumber: null })
+      return
+    }
+
+    const currentDocket = get().docket
+    if (!currentDocket) {
+      set({ selectedClaimId: id })
+      return
+    }
+
+    const claim = currentDocket.claims.find((c) => c.id === id)
+    if (!claim) {
+      set({ selectedClaimId: id })
+      return
+    }
+
+    let targetSurvey: string | null = null
+
+    // Check geometry exhibits
+    for (const exhibit of claim.exhibits) {
+      if (
+        exhibit.kind === 'geometry' &&
+        typeof exhibit.payload === 'object' &&
+        exhibit.payload !== null
+      ) {
+        const payloadObj = exhibit.payload as Record<string, unknown>
+        if (
+          'properties' in payloadObj &&
+          typeof payloadObj.properties === 'object' &&
+          payloadObj.properties !== null
+        ) {
+          const props = payloadObj.properties as Record<string, unknown>
+          if (typeof props.survey_number === 'string') {
+            targetSurvey = props.survey_number
+            break
+          }
+        }
+      }
+    }
+
+    // Check image exhibit parcel_id
+    if (targetSurvey === null && claim.type === 'MEDIA.PHOTO') {
+      for (const exhibit of claim.exhibits) {
+        if (
+          exhibit.kind === 'image' &&
+          typeof exhibit.payload === 'object' &&
+          exhibit.payload !== null
+        ) {
+          const payloadObj = exhibit.payload as Record<string, unknown>
+          if (typeof payloadObj.parcel_id === 'string') {
+            targetSurvey = payloadObj.parcel_id
+            break
+          }
+        }
+      }
+    }
+
+    // Fallback for GEO.PARCEL
+    if (targetSurvey === null && claim.type === 'GEO.PARCEL') {
+      targetSurvey = currentDocket.surveyNumber
+    }
+
+    if (targetSurvey !== null) {
+      set({ selectedClaimId: id, selectedSurveyNumber: targetSurvey })
+    } else {
+      // Non-geometry claim: leave selectedSurveyNumber unchanged
+      set({ selectedClaimId: id })
+    }
   },
 
   selectSurveyNumber: (surveyNumber: string | null): void => {
-    set({ selectedSurveyNumber: surveyNumber })
+    if (surveyNumber === null) {
+      set({ selectedSurveyNumber: null, selectedClaimId: null })
+      return
+    }
+
+    const currentDocket = get().docket
+    if (!currentDocket) {
+      set({ selectedSurveyNumber: surveyNumber })
+      return
+    }
+
+    let matchingClaimId: string | null = null
+    for (const claim of currentDocket.claims) {
+      for (const exhibit of claim.exhibits) {
+        if (
+          exhibit.kind === 'geometry' &&
+          typeof exhibit.payload === 'object' &&
+          exhibit.payload !== null
+        ) {
+          const payloadObj = exhibit.payload as Record<string, unknown>
+          if (
+            'properties' in payloadObj &&
+            typeof payloadObj.properties === 'object' &&
+            payloadObj.properties !== null
+          ) {
+            const props = payloadObj.properties as Record<string, unknown>
+            if (props.survey_number === surveyNumber) {
+              matchingClaimId = claim.id
+              break
+            }
+          }
+        }
+      }
+      if (matchingClaimId) break
+    }
+
+    if (!matchingClaimId) {
+      const geoClaim = currentDocket.claims.find((c) => c.type === 'GEO.PARCEL')
+      if (geoClaim) matchingClaimId = geoClaim.id
+    }
+
+    set({
+      selectedSurveyNumber: surveyNumber,
+      selectedClaimId: matchingClaimId ?? get().selectedClaimId,
+    })
   },
 
   clearError: (): void => {

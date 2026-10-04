@@ -1,23 +1,41 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 
-import { createParcelFeatureCollection } from './mapAdapter'
+import {
+  createParcelFeatureCollection,
+  createPhotoMarkerElement,
+  extractParcelProperties,
+  getParcelBounds,
+} from './mapAdapter'
 import {
   INLINE_BASEMAP_STYLE,
   PARCEL_FILL_LAYER,
+  PARCEL_FILL_LAYER_ID,
   PARCEL_LINE_LAYER,
   PARCEL_SOURCE_ID,
   TARGET_PARCEL_FILL_LAYER,
+  TARGET_PARCEL_FILL_LAYER_ID,
   TARGET_PARCEL_LINE_LAYER,
 } from './mapLayers'
 import { MOCK_DATASET_META, MOCK_PARCELS } from '@/data/mockGeoJSON'
-import type { MapView } from '@/services/mappers'
+import type { MapPhotoPoint, MapView } from '@/services/mappers'
+import { useDocketStore } from '@/store/docketStore'
 
 export interface BindMapProps {
   mapView?: MapView | null
   targetSurveyNumber?: string | null
   className?: string
 }
+
+interface HoverTooltipState {
+  surveyNumber: string
+  extentAcres: number
+  village: string
+  x: number
+  y: number
+}
+
+const EMPTY_PHOTOS: readonly MapPhotoPoint[] = []
 
 export function BindMap({
   mapView,
@@ -26,22 +44,37 @@ export function BindMap({
 }: BindMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
+  const markersRef = useRef<maplibregl.Marker[]>([])
+  const hoveredFeatureIdRef = useRef<string | number | null>(null)
 
-  // Determine parcels from props or fallback to mock fixture
-  const rawParcels =
-    mapView && mapView.parcels.length > 0
+  const selectSurveyNumber = useDocketStore((s) => s.selectSurveyNumber)
+
+  const [tooltip, setTooltip] = useState<HoverTooltipState | null>(null)
+
+  const rawParcels = useMemo(() => {
+    return mapView && mapView.parcels.length > 0
       ? mapView.parcels.map((p) => p.feature)
       : MOCK_PARCELS
+  }, [mapView])
 
-  const geoJsonData = createParcelFeatureCollection(
-    rawParcels,
-    targetSurveyNumber,
+  const photos = useMemo(
+    () => mapView?.photos ?? EMPTY_PHOTOS,
+    [mapView?.photos],
   )
 
+  const geoJsonData = useMemo(
+    () => createParcelFeatureCollection(rawParcels, targetSurveyNumber),
+    [rawParcels, targetSurveyNumber],
+  )
+
+  const initialParcelsRef = useRef(rawParcels)
+  const initialTargetRef = useRef(targetSurveyNumber)
+  const selectSurveyRef = useRef(selectSurveyNumber)
+  selectSurveyRef.current = selectSurveyNumber
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!containerRef.current) return
-
-    // Guard against React 18 StrictMode double-mount
     if (mapRef.current) return
 
     const map = new maplibregl.Map({
@@ -61,11 +94,10 @@ export function BindMap({
 
     map.on('load', () => {
       const initialData = createParcelFeatureCollection(
-        rawParcels,
-        targetSurveyNumber,
+        initialParcelsRef.current,
+        initialTargetRef.current,
       )
 
-      // Add Cadastral GeoJSON Source
       if (!map.getSource(PARCEL_SOURCE_ID)) {
         map.addSource(PARCEL_SOURCE_ID, {
           type: 'geojson',
@@ -73,7 +105,6 @@ export function BindMap({
         })
       }
 
-      // Add Layers
       if (!map.getLayer(PARCEL_FILL_LAYER.id)) {
         map.addLayer(PARCEL_FILL_LAYER)
       }
@@ -87,11 +118,96 @@ export function BindMap({
         map.addLayer(TARGET_PARCEL_LINE_LAYER)
       }
 
-      // Add navigation controls
       map.addControl(new maplibregl.NavigationControl(), 'top-right')
+
+      // Parcel Click Handler
+      const handleParcelClick = (
+        e: maplibregl.MapMouseEvent & {
+          features?: maplibregl.MapGeoJSONFeature[]
+        },
+      ) => {
+        const feature = e.features?.[0]
+        if (feature) {
+          const props = extractParcelProperties(
+            feature.properties as Record<string, unknown>,
+          )
+          selectSurveyRef.current(props.survey_number)
+        }
+      }
+
+      map.on('click', PARCEL_FILL_LAYER.id, handleParcelClick)
+      map.on('click', TARGET_PARCEL_FILL_LAYER.id, handleParcelClick)
+
+      // Map Canvas Background Click Handler
+      map.on('click', (e) => {
+        const features = map.queryRenderedFeatures(e.point, {
+          layers: [PARCEL_FILL_LAYER_ID, TARGET_PARCEL_FILL_LAYER_ID],
+        })
+        if (features.length === 0) {
+          selectSurveyRef.current(null)
+        }
+      })
+
+      // Hover Mousemove Handler
+      const handleMouseMove = (
+        e: maplibregl.MapMouseEvent & {
+          features?: maplibregl.MapGeoJSONFeature[]
+        },
+      ) => {
+        const feature = e.features?.[0]
+        if (!feature) return
+
+        map.getCanvas().style.cursor = 'pointer'
+
+        const props = extractParcelProperties(
+          feature.properties as Record<string, unknown>,
+        )
+
+        if (feature.id !== undefined && feature.id !== null) {
+          if (
+            hoveredFeatureIdRef.current !== null &&
+            hoveredFeatureIdRef.current !== feature.id
+          ) {
+            map.setFeatureState(
+              { source: PARCEL_SOURCE_ID, id: hoveredFeatureIdRef.current },
+              { hover: false },
+            )
+          }
+          hoveredFeatureIdRef.current = feature.id
+          map.setFeatureState(
+            { source: PARCEL_SOURCE_ID, id: feature.id },
+            { hover: true },
+          )
+        }
+
+        setTooltip({
+          surveyNumber: props.survey_number,
+          extentAcres: props.extent_acres,
+          village: props.village,
+          x: e.point.x,
+          y: e.point.y,
+        })
+      }
+
+      // Hover Mouseleave Handler
+      const handleMouseLeave = () => {
+        map.getCanvas().style.cursor = ''
+        if (hoveredFeatureIdRef.current !== null) {
+          map.setFeatureState(
+            { source: PARCEL_SOURCE_ID, id: hoveredFeatureIdRef.current },
+            { hover: false },
+          )
+          hoveredFeatureIdRef.current = null
+        }
+        setTooltip(null)
+      }
+
+      map.on('mousemove', PARCEL_FILL_LAYER.id, handleMouseMove)
+      map.on('mousemove', TARGET_PARCEL_FILL_LAYER.id, handleMouseMove)
+      map.on('mouseleave', PARCEL_FILL_LAYER.id, handleMouseLeave)
+      map.on('mouseleave', TARGET_PARCEL_FILL_LAYER.id, handleMouseLeave)
     })
 
-    // ResizeObserver with rAF for dynamic container resizes without loop warnings
     let resizeObserver: ResizeObserver | null = null
     if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
       resizeObserver = new ResizeObserver(() => {
@@ -110,26 +226,61 @@ export function BindMap({
         try {
           mapRef.current.remove()
         } catch {
-          // Ignore cleanup errors during unmount
+          // Ignore cleanup errors
         }
         mapRef.current = null
       }
     }
-  }, [rawParcels, targetSurveyNumber])
+  }, [])
 
-  // Update source data when targetSurveyNumber or mapView changes
+  // Sync GeoJSON data and fit bounds when target/parcels change
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
-    const source = map.getSource(PARCEL_SOURCE_ID) as maplibregl.GeoJSONSource | undefined
+    const source = map.getSource(PARCEL_SOURCE_ID) as
+      | maplibregl.GeoJSONSource
+      | undefined
     if (source && typeof source.setData === 'function') {
       source.setData(geoJsonData)
     }
-  }, [geoJsonData])
+
+    if (targetSurveyNumber) {
+      const targetFeature = rawParcels.find(
+        (f) => f.properties.survey_number === targetSurveyNumber,
+      )
+      if (targetFeature) {
+        const bounds = getParcelBounds(targetFeature)
+        if (bounds && typeof map.fitBounds === 'function') {
+          map.fitBounds(bounds, { padding: 40, maxZoom: 17 })
+        }
+      }
+    }
+  }, [geoJsonData, targetSurveyNumber, rawParcels])
+
+  // Update Photo Markers
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    markersRef.current.forEach((marker) => marker.remove())
+    markersRef.current = []
+
+    photos.forEach((photo) => {
+      const el = createPhotoMarkerElement(photo)
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([photo.lon, photo.lat])
+        .addTo(map)
+      markersRef.current.push(marker)
+    })
+  }, [photos])
 
   return (
-    <div className={['relative h-full w-full min-h-[300px]', className].filter(Boolean).join(' ')}>
+    <div
+      className={['relative h-full w-full min-h-[300px]', className]
+        .filter(Boolean)
+        .join(' ')}
+    >
       {/* Accessible screen reader summary */}
       <div className="sr-only" aria-live="polite">
         Cadastral map showing target parcel {targetSurveyNumber ?? 'none'} and{' '}
@@ -144,8 +295,28 @@ export function BindMap({
         className="h-full w-full rounded-b-lg overflow-hidden min-h-[300px]"
       />
 
-      {/* Place reserved for photo markers in Step 8 */}
-      <div id="photo-markers-layer" className="pointer-events-none absolute inset-0" />
+      {/* Hover Tooltip Popup */}
+      {tooltip && (
+        <div
+          data-testid="map-hover-tooltip"
+          style={{ left: `${tooltip.x + 12}px`, top: `${tooltip.y + 12}px` }}
+          className="pointer-events-none absolute z-20 rounded border border-line bg-surface-1/95 px-2.5 py-1.5 text-xs text-slate-100 shadow-lg backdrop-blur"
+        >
+          <div className="font-mono font-semibold text-emerald-300">
+            Survey {tooltip.surveyNumber}
+          </div>
+          <div className="text-[11px] text-slate-400">
+            {tooltip.extentAcres} acres · {tooltip.village}
+          </div>
+        </div>
+      )}
+
+      {/* Place reserved for photo markers layer */}
+      <div
+        id="photo-markers-layer"
+        className="pointer-events-none absolute inset-0"
+      />
     </div>
   )
 }
+

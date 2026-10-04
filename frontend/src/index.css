@@ -1,0 +1,46 @@
+@import 'tailwindcss';
+
+/*
+ * BIND design tokens (Tailwind v4 CSS-first configuration).
+ *
+ * Semantic surface/border tokens map onto the default palette so components never
+ * reach for raw colours. Status tones live in `src/lib/status.ts` and are applied
+ * as literal Tailwind classes in `StatusGlyphIcon` — that keeps the design system
+ * and the accessibility rules in one reviewable place.
+ */
+@theme {
+  /* Layered surfaces: page → panel → raised element */
+  --color-surface-0: var(--color-slate-950);
+  --color-surface-1: var(--color-slate-900);
+  --color-surface-2: var(--color-slate-800);
+
+  /* Single hairline used for every divider and panel border */
+  --color-line: var(--color-slate-800);
+
+  /* Focus ring colour, referenced by the :focus-visible rule below */
+  --color-focus-ring: var(--color-sky-400);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-surface-0 text-slate-100 antialiased;
+    font-synthesis-weight: none;
+    font-family:
+      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+      Arial, sans-serif;
+  }
+
+  /* Numbers in tables/cost figures should align; keep them tabular by default. */
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Visible focus for keyboard users — accessibility requirement (BIND rule §16). */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-focus-ring;
+  }
+}

@@ -12,7 +12,13 @@ import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { Header } from '@/components/layout/Header'
 import { Panel } from '@/components/layout/Panel'
-import { useDocket, useError, useLoadState, useSelectedClaim } from '@/hooks'
+import {
+  useDocket,
+  useError,
+  useLoadState,
+  useSelectedClaim,
+  useSelectedSurveyNumber,
+} from '@/hooks'
 import { MOCK_DEFAULT_DOCKET_ID } from '@/services/mockApi'
 import { useDocketStore } from '@/store/docketStore'
 import { DOCKET_STATUS } from '@/types'
@@ -20,6 +26,7 @@ import { DOCKET_STATUS } from '@/types'
 export function Dashboard() {
   const docket = useDocket()
   const selectedClaim = useSelectedClaim()
+  const selectedSurveyNumber = useSelectedSurveyNumber()
   const loadState = useLoadState()
   const error = useError()
   const loadDocket = useDocketStore((state) => state.loadDocket)
@@ -143,7 +150,7 @@ export function Dashboard() {
           >
             <BindMap
               mapView={docket?.map}
-              targetSurveyNumber={docket?.surveyNumber}
+              targetSurveyNumber={selectedSurveyNumber ?? docket?.surveyNumber}
             />
           </Panel>
 

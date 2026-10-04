@@ -31,8 +31,18 @@ export const PARCEL_FILL_LAYER: AddLayerObject = {
   source: PARCEL_SOURCE_ID,
   filter: ['!=', ['get', 'is_target'], true],
   paint: {
-    'fill-color': '#1e293b',
-    'fill-opacity': 0.6,
+    'fill-color': [
+      'case',
+      ['boolean', ['feature-state', 'hover'], false],
+      '#334155',
+      '#1e293b',
+    ],
+    'fill-opacity': [
+      'case',
+      ['boolean', ['feature-state', 'hover'], false],
+      0.85,
+      0.6,
+    ],
   },
 }
 
@@ -54,8 +64,18 @@ export const TARGET_PARCEL_FILL_LAYER: AddLayerObject = {
   source: PARCEL_SOURCE_ID,
   filter: ['==', ['get', 'is_target'], true],
   paint: {
-    'fill-color': '#065f46',
-    'fill-opacity': 0.7,
+    'fill-color': [
+      'case',
+      ['boolean', ['feature-state', 'hover'], false],
+      '#047857',
+      '#065f46',
+    ],
+    'fill-opacity': [
+      'case',
+      ['boolean', ['feature-state', 'hover'], false],
+      0.9,
+      0.7,
+    ],
   },
 }
 
