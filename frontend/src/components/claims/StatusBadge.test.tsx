@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { StatusBadge } from './StatusBadge'
+import { CLAIM_STATUS } from '@/types'
 
 describe('StatusBadge', () => {
   it('shows the status word, not just a colour', () => {
@@ -14,6 +15,24 @@ describe('StatusBadge', () => {
     render(<StatusBadge status="REJECTED" />)
 
     expect(screen.getByRole('status')).toHaveAccessibleName('Status: Rejected')
+  })
+
+  it('renders all six claim statuses correctly (OPEN, BINDING, STAMPED, REJECTED, ABSTAINED, DISPUTE)', () => {
+    const statuses = [
+      CLAIM_STATUS.OPEN,
+      CLAIM_STATUS.BINDING,
+      CLAIM_STATUS.STAMPED,
+      CLAIM_STATUS.REJECTED,
+      CLAIM_STATUS.ABSTAINED,
+      CLAIM_STATUS.DISPUTE,
+    ]
+
+    for (const status of statuses) {
+      const { unmount } = render(<StatusBadge status={status} />)
+      expect(screen.getByText(status)).toBeInTheDocument()
+      expect(screen.getByRole('status')).toBeInTheDocument()
+      unmount()
+    }
   })
 
   it('marks the tone so rejected is distinguishable from open', () => {
@@ -39,3 +58,4 @@ describe('StatusBadge', () => {
     expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   })
 })
+

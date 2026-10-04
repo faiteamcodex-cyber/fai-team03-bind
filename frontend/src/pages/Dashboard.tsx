@@ -9,6 +9,7 @@ import { DocketSummaryBar } from '@/components/docket/DocketSummaryBar'
 
 import { BindMap } from '@/components/map/BindMap'
 
+import { ApiErrorBanner } from '@/components/layout/ApiErrorBanner'
 import { AppShell } from '@/components/layout/AppShell'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { Header } from '@/components/layout/Header'
@@ -58,22 +59,7 @@ export function Dashboard() {
       }
     >
       {loadState === 'error' && error ? (
-        <div
-          role="alert"
-          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-red-200"
-        >
-          <div>
-            <h3 className="text-sm font-semibold">API Error</h3>
-            <p className="mt-1 text-xs">{error.detail ?? error.message}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            className="rounded bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-100 hover:bg-red-500/30"
-          >
-            Retry
-          </button>
-        </div>
+        <ApiErrorBanner error={error} onRetry={() => void refresh()} />
       ) : null}
 
       {isInProgress && (

@@ -74,4 +74,14 @@ describe('Dashboard page', () => {
       screen.getByRole('heading', { name: 'Cost comparison' }),
     ).toBeInTheDocument()
   })
+
+  it('renders the empty state when no docket is loaded', () => {
+    useDocketStore.setState({ loadState: 'ready', docket: null, error: null })
+
+    render(<Dashboard />)
+
+    expect(
+      screen.getByRole('button', { name: /load default docket/i }),
+    ).toBeInTheDocument()
+  })
 })
