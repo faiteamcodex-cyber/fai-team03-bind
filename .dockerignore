@@ -1,0 +1,17 @@
+.git
+.gitignore
+.env
+.env.*
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.coverage
+htmlcov
+artifacts/
+.aws-sam/
+node_modules/
+venv/
+.venv/
+*.md

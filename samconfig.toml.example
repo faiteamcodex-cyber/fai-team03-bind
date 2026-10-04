@@ -1,0 +1,32 @@
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "bind-backend-dev"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.validate.parameters]
+lint = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+s3_prefix = "bind-sam"
+region = "ap-south-1"
+profile = "fai-team03"
+parameter_overrides = [
+    "Environment=\"dev\"",
+    "AwsRegion=\"ap-south-1\"",
+    "DatasetBucketName=\"fai-tce-team03-datasets\"",
+    "AppStateBucketName=\"fai-tce-team03-app-state\"",
+    "LandRecordsTableName=\"fai-tce-team03-land-records\"",
+    "EmbeddingModelId=\"amazon.titan-embed-text-v2:0\"",
+    "PlannerModelId=\"apac.amazon.nova-micro-v1:0\"",
+    "StudentVisionModelId=\"apac.amazon.nova-lite-v1:0\"",
+    "TeacherVisionModelId=\"apac.amazon.nova-lite-v1:0\""
+]
+image_repositories = []

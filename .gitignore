@@ -32,3 +32,8 @@ temp_extracted.txt
 node_modules/
 dist/
 build/
+
+# Build artifacts and egg-info
+*.egg-info/
+artifacts/
+backend/artifacts/

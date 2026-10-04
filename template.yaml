@@ -1,0 +1,205 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  BIND (Cross-Modal Claim Runtime) - Serverless AWS Infrastructure for FarmwiseAI Task 1.
+  Member 3 DevOps & Cloud Architecture.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment stage.
+  
+  AwsRegion:
+    Type: String
+    Default: ap-south-1
+    Description: AWS Deployment Region.
+
+  DatasetBucketName:
+    Type: String
+    Default: fai-tce-team03-datasets
+    Description: S3 bucket name containing raw datasets (crop images, cadastral GeoJSON, advisories).
+
+  AppStateBucketName:
+    Type: String
+    Default: fai-tce-team03-app-state
+    Description: S3 bucket name for ChromaDB persistent vector index and runtime application state.
+
+  LandRecordsTableName:
+    Type: String
+    Default: fai-tce-team03-land-records
+    Description: DynamoDB table name for cadastral land registry records.
+
+  EmbeddingModelId:
+    Type: String
+    Default: amazon.titan-embed-text-v2:0
+    Description: Bedrock model ID for Titan Text Embeddings V2.
+
+  PlannerModelId:
+    Type: String
+    Default: apac.amazon.nova-micro-v1:0
+    Description: Bedrock model ID for LLM Planner (or in.openai.gpt-5.6-luna).
+
+  StudentVisionModelId:
+    Type: String
+    Default: apac.amazon.nova-lite-v1:0
+    Description: Bedrock model ID for Student Vision VLM (Nova Lite).
+
+  TeacherVisionModelId:
+    Type: String
+    Default: apac.amazon.nova-lite-v1:0
+    Description: Bedrock model ID for Teacher Vision VLM (or in.openai.gpt-5.6-terra).
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 2048
+    Environment:
+      Variables:
+        AWS_REGION: !Ref AwsRegion
+        DATA_BUCKET: !Ref DatasetBucketName
+        STATE_BUCKET: !Ref AppStateBucketName
+        LAND_RECORDS_TABLE: !Ref LandRecordsTableName
+        TITAN_EMBEDDING_MODEL_ID: !Ref EmbeddingModelId
+        BIND_PLANNER_MODEL_ID: !Ref PlannerModelId
+        BIND_STUDENT_VISION_MODEL_ID: !Ref StudentVisionModelId
+        BIND_TEACHER_VISION_MODEL_ID: !Ref TeacherVisionModelId
+        CHROMA_COLLECTION: advisory_store
+        CHROMA_PERSIST_DIR: /tmp/chroma
+        BIND_DEBUG: "false"
+
+Resources:
+  # =========================================================================
+  # 1. DynamoDB Land Records Table (Pay-per-request / On-Demand)
+  # =========================================================================
+  LandRecordsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref LandRecordsTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: survey_number
+          AttributeType: S
+      KeySchema:
+        - AttributeName: survey_number
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Project
+          Value: BIND
+        - Key: Team
+          Value: fai-tce-team03
+        - Key: ManagedBy
+          Value: AWS-SAM
+
+  # =========================================================================
+  # 2. HTTP API Gateway with Localhost CORS Configuration
+  # =========================================================================
+  BindHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+          - X-Amz-Date
+          - X-Api-Key
+          - X-Amz-Security-Token
+        AllowOrigins:
+          - "http://localhost:3000"
+          - "http://localhost:5173"
+          - "http://localhost:8000"
+          - "*"
+        MaxAge: 600
+
+  # =========================================================================
+  # 3. Serverless Lambda Kernel (Container Packaging for GeoPandas/GDAL)
+  # =========================================================================
+  BindKernelFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      Description: BIND Cross-Modal Claim Runtime Kernel (FastAPI + Mangum + GeoPandas)
+      Policies:
+        # S3 Read access to raw dataset bucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:ListBucket
+              Resource:
+                - !Sub "arn:aws:s3:::${DatasetBucketName}"
+                - !Sub "arn:aws:s3:::${DatasetBucketName}/*"
+
+        # S3 Read/Write access to application state bucket (ChromaDB backups)
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:ListBucket
+              Resource:
+                - !Sub "arn:aws:s3:::${AppStateBucketName}"
+                - !Sub "arn:aws:s3:::${AppStateBucketName}/*"
+
+        # DynamoDB Read/Write access to land records table
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:BatchGetItem
+                - dynamodb:Query
+                - dynamodb:Scan
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:BatchWriteItem
+              Resource:
+                - !GetAtt LandRecordsTable.Arn
+
+        # AWS Bedrock model invocation permissions (Titan, Nova, Luna, Terra)
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+                - bedrock:Converse
+                - bedrock:ConverseStream
+              Resource: "*"
+      Events:
+        ApiRoot:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BindHttpApi
+            Path: /{proxy+}
+            Method: ANY
+        HealthRoot:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BindHttpApi
+            Path: /
+            Method: GET
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: .
+      DockerTag: bind-kernel-v1
+
+Outputs:
+  ApiEndpoint:
+    Description: HTTP API Gateway endpoint URL for BIND Kernel
+    Value: !Sub "https://${BindHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  
+  LandRecordsTableArn:
+    Description: DynamoDB Table ARN for Land Records
+    Value: !GetAtt LandRecordsTable.Arn
+
+  BindKernelFunctionArn:
+    Description: Lambda Function ARN for BIND Kernel
+    Value: !GetAtt BindKernelFunction.Arn

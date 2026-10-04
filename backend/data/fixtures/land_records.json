@@ -1,0 +1,58 @@
+[
+  {
+    "survey_number": "202/55",
+    "owner_name": "Ramasamy S.",
+    "owner_id": "OWN-TN-2024-0981",
+    "village": "Kadambur",
+    "taluk": "Orathanadu",
+    "district": "Thanjavur",
+    "area_hectares": 1.0117,
+    "extent_acres": 2.5,
+    "patta_number": "P-4521",
+    "mutation_date": "2019-03-14",
+    "registry_source": "TN-DLRS-Thanjavur-2024",
+    "updated_at": "2024-01-15T09:00:00Z"
+  },
+  {
+    "survey_number": "202/54",
+    "owner_name": "Lakshmi K.",
+    "owner_id": "OWN-TN-2024-0982",
+    "village": "Kadambur",
+    "taluk": "Orathanadu",
+    "district": "Thanjavur",
+    "area_hectares": 1.2545,
+    "extent_acres": 3.1,
+    "patta_number": "P-4520",
+    "mutation_date": "2020-07-22",
+    "registry_source": "TN-DLRS-Thanjavur-2024",
+    "updated_at": "2024-01-15T09:00:00Z"
+  },
+  {
+    "survey_number": "145/2",
+    "owner_name": "Murugan V.",
+    "owner_id": "OWN-TN-2024-0983",
+    "village": "Kadambur",
+    "taluk": "Orathanadu",
+    "district": "Thanjavur",
+    "area_hectares": 0.7284,
+    "extent_acres": 1.8,
+    "patta_number": "P-6012",
+    "mutation_date": "2021-01-05",
+    "registry_source": "TN-DLRS-Thanjavur-2024",
+    "updated_at": "2024-01-15T09:00:00Z"
+  },
+  {
+    "survey_number": "88/1B",
+    "owner_name": "Selvaraj P.",
+    "owner_id": "OWN-TN-2023-0451",
+    "village": "Kadambur",
+    "taluk": "Orathanadu",
+    "district": "Thanjavur",
+    "area_hectares": 1.6997,
+    "extent_acres": 4.2,
+    "patta_number": "P-3301",
+    "mutation_date": "2018-11-30",
+    "registry_source": "TN-DLRS-Thanjavur-2023",
+    "updated_at": "2024-01-15T09:00:00Z"
+  }
+]

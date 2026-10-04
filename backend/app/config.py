@@ -1,8 +1,14 @@
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
+
+# Ensure backend/src is in sys.path for bind_data package resolution
+_src_path = str(Path(__file__).resolve().parent.parent / "src")
+if _src_path not in sys.path:
+    sys.path.insert(0, _src_path)
 
 # Find and load .env file with override=True so .env takes precedence over OS environment variables
 possible_env_paths = [

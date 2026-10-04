@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bind-kernel"
+version = "0.1.0"
+description = "BIND - Cross-Modal Claim Runtime Kernel for Agricultural Land-Survey Processing"
+authors = [{ name = "Team 03 (Member 3 - Data/GIS & DevOps)" }]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "boto3>=1.35.0",
+    "geopandas>=1.0.0",
+    "shapely>=2.0.0",
+    "chromadb>=0.6.0",
+    "pypdf>=5.0.0",
+    "mangum>=0.19.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["backend/tests"]
+pythonpath = ["backend/src", "backend"]
+python_files = "test_*.py"
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]

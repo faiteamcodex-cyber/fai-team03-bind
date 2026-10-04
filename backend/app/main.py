@@ -54,6 +54,13 @@ app.add_middleware(
 # Include API routes
 app.include_router(router)
 
+# AWS Lambda handler adapter
+try:
+    from mangum import Mangum
+    handler = Mangum(app, lifespan="off")
+except ImportError:
+    handler = None
+
 
 if __name__ == "__main__":
     import uvicorn

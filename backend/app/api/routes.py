@@ -14,9 +14,18 @@ router = APIRouter(prefix="/api/v1", tags=["docket"])
 # In-memory docket storage (for demo; replace with DynamoDB in production)
 _docket_store: dict[str, Docket] = {}
 
-# Singleton kernel instance
+# Singleton kernel and connector instances
+from app.connectors.geography import GeographyConnector
+from app.connectors.land_record import LandRecordConnector
+from app.connectors.advisory_store import AdvisoryStoreConnector
+
 _bedrock_client = BedrockClient()
-_kernel = DocketKernel(bedrock_client=_bedrock_client)
+_connectors = {
+    "geography": GeographyConnector(),
+    "land_record": LandRecordConnector(),
+    "advisory_store": AdvisoryStoreConnector(),
+}
+_kernel = DocketKernel(bedrock_client=_bedrock_client, connectors=_connectors)
 
 
 @router.post("/docket", response_model=DocketResponse)
