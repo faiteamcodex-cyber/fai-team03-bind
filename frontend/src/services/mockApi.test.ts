@@ -85,4 +85,51 @@ describe('mockApi', () => {
 
     expect(elapsed).toBeGreaterThanOrEqual(30)
   })
+
+  it('advances in-flight docket snapshots on successive calls until reaching CLOSED', async () => {
+    configureMockApi({ latencyMs: 0 })
+    const inFlightId = 'dkt-1d5b3e88'
+
+    const snap0 = await mockApi.getDocket(inFlightId)
+    expect(snap0.docket.status).toBe('EXECUTING')
+
+    const snap1 = await mockApi.getDocket(inFlightId)
+    expect(snap1.docket.status).toBe('EXECUTING')
+
+    const snap2 = await mockApi.getDocket(inFlightId)
+    expect(snap2.docket.status).toBe('VERIFYING')
+
+    const snap3 = await mockApi.getDocket(inFlightId)
+    expect(snap3.docket.status).toBe('CLOSED')
+
+    // Repeated calls hold on the final CLOSED snapshot
+    const snap4 = await mockApi.getDocket(inFlightId)
+    expect(snap4.docket.status).toBe('CLOSED')
+  })
+
+  it('resets in-flight progression when configureMockApi is called', async () => {
+    configureMockApi({ latencyMs: 0 })
+    const inFlightId = 'dkt-1d5b3e88'
+
+    await mockApi.getDocket(inFlightId) // snap 0 (EXECUTING)
+    await mockApi.getDocket(inFlightId) // snap 1 (EXECUTING)
+    await mockApi.getDocket(inFlightId) // snap 2 (VERIFYING)
+
+    configureMockApi({ latencyMs: 0 }) // reset
+
+    const resetSnap = await mockApi.getDocket(inFlightId)
+    expect(resetSnap.docket.status).toBe('EXECUTING')
+  })
+
+  it('leaves the stamped fixture unchanged on repeated calls', async () => {
+    configureMockApi({ latencyMs: 0 })
+
+    const res1 = await mockApi.getDocket(MOCK_DOCKET_STAMPED.id)
+    const res2 = await mockApi.getDocket(MOCK_DOCKET_STAMPED.id)
+
+    expect(res1.docket.status).toBe('CLOSED')
+    expect(res2.docket.status).toBe('CLOSED')
+    expect(res1.docket).toEqual(res2.docket)
+  })
 })
+

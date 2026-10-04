@@ -17,6 +17,7 @@
 import {
   DEFAULT_MOCK_DOCKET_ID,
   MOCK_DOCKETS,
+  MOCK_DOCKET_IN_FLIGHT_SNAPSHOTS,
   MOCK_DOCKET_RESPONSES,
   MOCK_OPEN_DOCKET_RESPONSE,
 } from '@/data/mockDocket'
@@ -27,6 +28,7 @@ import type {
   DocketResponse,
   HealthResponse,
 } from '@/types'
+import { DOCKET_STATUS } from '@/types'
 
 import { ApiError } from './api'
 
@@ -45,9 +47,17 @@ let options: Required<MockApiOptions> = {
   simulateFailure: false,
 }
 
+let inFlightSnapshotIndex = 0
+
+/** Reset the in-flight docket snapshot progression back to initial state. */
+export function resetInFlightProgress(): void {
+  inFlightSnapshotIndex = 0
+}
+
 /** Adjust mock behaviour at runtime (tests and the dev failure toggle). */
 export function configureMockApi(next: MockApiOptions): void {
   options = { ...options, ...next }
+  inFlightSnapshotIndex = 0
 }
 
 export function getMockApiOptions(): Required<MockApiOptions> {
@@ -88,6 +98,23 @@ export const mockApi: BindApi = {
 
   async getDocket(docketId: string): Promise<DocketResponse> {
     return simulate(() => {
+      if (docketId === MOCK_DOCKET_IN_FLIGHT_SNAPSHOTS[0]?.id) {
+        const snapshot =
+          MOCK_DOCKET_IN_FLIGHT_SNAPSHOTS[inFlightSnapshotIndex] ??
+          MOCK_DOCKET_IN_FLIGHT_SNAPSHOTS[MOCK_DOCKET_IN_FLIGHT_SNAPSHOTS.length - 1]!
+
+        if (inFlightSnapshotIndex < MOCK_DOCKET_IN_FLIGHT_SNAPSHOTS.length - 1) {
+          inFlightSnapshotIndex++
+        }
+
+        const summary =
+          snapshot.status === DOCKET_STATUS.CLOSED
+            ? 'Docket dkt-1d5b3e88 closed with 5 stamped, 1 abstained, 0 rejected claims. Total cost: $0.0140 (vs $0.0310 always-VLM estimate).'
+            : null
+
+        return { docket: snapshot, summary }
+      }
+
       const response = MOCK_DOCKET_RESPONSES[docketId]
       if (!response) {
         throw new ApiError('client', `Docket ${docketId} not found.`, {

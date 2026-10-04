@@ -31,16 +31,18 @@ export const env = {
   apiBaseUrl: stripTrailingSlash(readString(import.meta.env.VITE_API_BASE_URL)),
 
   /** Defaults to mock: the app must be runnable with zero backend available. */
-  useMockApi: readBoolean(import.meta.env.VITE_USE_MOCK_API, true),
+  get useMockApi(): boolean {
+    return readBoolean(import.meta.env.VITE_USE_MOCK_API, true)
+  },
 
   /** Optional GeoJSON endpoint; falls back to the labelled local fixture. */
   geojsonUrl: readString(import.meta.env.VITE_GEOJSON_URL),
-} as const
+}
 
 /** Which data source the app is currently wired to. */
 export const dataSourceMode: DataSourceMode = env.useMockApi ? 'mock' : 'live'
 
-export const isMockMode = (): boolean => dataSourceMode === 'mock'
+export const isMockMode = (): boolean => env.useMockApi
 
 /**
  * Configuration problems that should be shown to the user rather than thrown.

@@ -50,6 +50,8 @@ export const useDocketStore = create<DocketState>((set, get) => ({
         docketView.status === DOCKET_STATUS.FAILED
       ) {
         get().stopPolling()
+      } else if (!get().isPolling) {
+        get().startPolling()
       }
     } catch (err) {
       const apiErr =
@@ -79,6 +81,8 @@ export const useDocketStore = create<DocketState>((set, get) => ({
         docketView.status === DOCKET_STATUS.FAILED
       ) {
         get().stopPolling()
+      } else if (!get().isPolling) {
+        get().startPolling()
       }
     } catch (err) {
       const apiErr =

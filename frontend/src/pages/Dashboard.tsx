@@ -6,6 +6,7 @@ import { CostComparisonPanel } from '@/components/cost/CostComparisonPanel'
 import { ClaimDetail } from '@/components/docket/ClaimDetail'
 import { DocketList } from '@/components/docket/DocketList'
 import { DocketSummaryBar } from '@/components/docket/DocketSummaryBar'
+import { MockDocketSwitcher } from '@/components/docket/MockDocketSwitcher'
 
 import { BindMap } from '@/components/map/BindMap'
 
@@ -55,6 +56,7 @@ export function Dashboard() {
           statusSlot={
             docket ? <StatusBadge status={docket.status} size="md" /> : null
           }
+          docketSwitcherSlot={<MockDocketSwitcher />}
         />
       }
     >

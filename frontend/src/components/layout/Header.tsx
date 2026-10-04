@@ -7,6 +7,8 @@ export interface HeaderProps {
   docketId?: string | null
   /** Optional status node (a StatusBadge) for the docket itself. */
   statusSlot?: ReactNode
+  /** Optional slot for dev/mock docket switcher control. */
+  docketSwitcherSlot?: ReactNode
 }
 
 /**
@@ -15,7 +17,7 @@ export interface HeaderProps {
  * The mock/live badge is deliberate — BIND rule 11/19 requires that data provenance
  * is never ambiguous, especially while Member 1's backend is not yet deployed.
  */
-export function Header({ docketId, statusSlot }: HeaderProps) {
+export function Header({ docketId, statusSlot, docketSwitcherSlot }: HeaderProps) {
   const configIssues = getEnvConfigIssues()
 
   return (
@@ -31,6 +33,7 @@ export function Header({ docketId, statusSlot }: HeaderProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {docketSwitcherSlot}
           {statusSlot}
 
           <dl className="flex items-baseline gap-2 text-xs">
