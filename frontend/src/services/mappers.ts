@@ -235,6 +235,8 @@ export interface DocketView {
   readonly claims: readonly ClaimView[]
   readonly cost: CostView
   readonly map: MapView
+  readonly costs: readonly CostEntry[]
+  readonly routes: readonly RouteEntry[]
   readonly createdMs: number
   readonly closedMs: number | null
   readonly totalLatencyMs: number
@@ -251,6 +253,8 @@ export function toDocketView(docket: Docket): DocketView {
     claims: toClaimViews(docket),
     cost: toCostView(docket),
     map: toMapView(docket),
+    costs: docket.costs,
+    routes: docket.routes,
     createdMs: docket.created_ms,
     closedMs: docket.closed_ms,
     totalLatencyMs: docket.total_latency_ms,

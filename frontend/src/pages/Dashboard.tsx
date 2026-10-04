@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 
 import { StatusBadge } from '@/components/claims/StatusBadge'
 
+import { CostComparisonPanel } from '@/components/cost/CostComparisonPanel'
 import { ClaimDetail } from '@/components/docket/ClaimDetail'
 import { DocketList } from '@/components/docket/DocketList'
 import { DocketSummaryBar } from '@/components/docket/DocketSummaryBar'
@@ -118,7 +119,7 @@ export function Dashboard() {
             <Panel
               id="cost"
               title="Cost comparison"
-              description="Routed execution vs. always-Terra baseline."
+              description="Routed execution vs. baseline estimate."
             >
               <div className="flex h-full min-h-[100px] items-center justify-center p-4">
                 <p className="text-xs text-slate-400">Loading cost estimates...</p>
@@ -186,13 +187,16 @@ export function Dashboard() {
             <Panel
               id="cost"
               title="Cost comparison"
-              description="Routed execution vs. always-Terra baseline."
+              description="Routed execution vs. baseline estimate."
             >
-              <div className="p-4">
-                <p className="text-xs text-slate-500">
-                  Cost region. Figures come from the backend's cost summary — the
-                  frontend never prices anything itself (Step 8).
-                </p>
+              <div className="p-4 overflow-y-auto max-h-[360px]">
+                {docket && (
+                  <CostComparisonPanel
+                    cost={docket.cost}
+                    costs={docket.costs}
+                    routes={docket.routes}
+                  />
+                )}
               </div>
             </Panel>
           </div>
