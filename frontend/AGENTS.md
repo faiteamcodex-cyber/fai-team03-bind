@@ -59,9 +59,11 @@ Source of truth for architecture: `BIND_Implementation_Plan.pdf`.
    every `VITE_*` value into the public JavaScript bundle.
 4. **Never hardcode API URLs, model names (`luna`, `terra`, `nova-lite`), or prices.**
    Endpoints come from `import.meta.env`; model names and costs come from API payloads.
-5. **`src/types/` is TEMPORARY** until Member 1 publishes the Pydantic schemas /
-   OpenAPI spec (`src/services/mappers.ts` is the only translator).
-   **Do not invent new backend fields.** If a field is missing, render `—`.
+5. **`src/types/` mirrors the backend schemas — it is locked, and you must not extend
+   it.** It was hand-mirrored from `backend/app/schemas/` (`enums.py`, `models.py`) at
+   commit 71c6e80. `src/services/mappers.ts` is the only DTO → view-model translator.
+   **Do not invent backend fields.** If a field is missing, render `—`. If the backend
+   models change, regenerate `src/types/` from them — never guess, never add.
 6. **Never use real land records.** All fixtures live in `src/data/` and must be
    labelled `MOCK DATA`. No real survey numbers, owners, or parcel geometry.
 7. **Mock data must stay structurally compatible with the real API** — same field names,
@@ -83,7 +85,7 @@ services/    → the ONLY place that talks to the network.
   api.ts     → real transport (fetch), env-driven base URL
   mockApi.ts → same interface, returns fixtures
   mappers.ts → backend DTO → frontend view model (the only file that knows DTO field names)
-types/       → TEMPORARY contract types
+types/       → MIRRORED from backend/app/schemas (locked; regenerate, never guess)
 data/        → MOCK fixtures (docket + GeoJSON)
 lib/         → pure helpers: formatting, status metadata, env access
 components/map/ → MapLibre isolated here. mapAdapter.ts is the ONLY file that knows
